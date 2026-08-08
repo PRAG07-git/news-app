@@ -6,7 +6,7 @@ import InfiniteScroll from "react-infinite-scroll-component";
 
 export class NewsComp extends Component {
   static defaultProps = {
-    country: "us",
+    country: "in",
     pageSize: 9,
     category: "general",
   };
@@ -16,8 +16,9 @@ export class NewsComp extends Component {
     pageSize: PropTypes.number,
     category: PropTypes.string,
   };
+
   capitalizeFirstLetter = (string) => {
-    return string.charAt(0).toUpperCase() + string.slice(1);
+    return string ? string.charAt(0).toUpperCase() + string.slice(1) : "";
   };
 
   constructor(props) {
@@ -29,19 +30,31 @@ export class NewsComp extends Component {
       totalResults: 0,
     };
     document.title = `NewsMonkey - ${this.capitalizeFirstLetter(
-      props.category
+      props.category,
     )}`;
   }
+
   async updateNews() {
-    const url = `https://newsapi.org/v2/top-headlines?country=${this.props.country}&category=${this.props.category}&apiKey=619262788d3749169804d7f7be46b962&page=${this.state.page}&pageSize=${this.props.pageSize}`;
     this.setState({ loading: true });
-    let data = await fetch(url);
-    let parseddata = await data.json();
-    this.setState({
-      articles: parseddata.articles,
-      totalResults: parseddata.totalResults,
-      loading: false,
-    });
+
+    // Reliable CORS-Free Public Feed API
+    const category = this.props.category || "general";
+    const url = `https://saurav.tech/NewsAPI/top-headlines/category/${category}/in.json`;
+
+    try {
+      let response = await fetch(url);
+      let parsedData = await response.json();
+
+      const articlesList = parsedData.articles || [];
+      this.setState({
+        articles: articlesList,
+        totalResults: parsedData.totalResults || articlesList.length,
+        loading: false,
+      });
+    } catch (error) {
+      console.error("Error fetching news:", error);
+      this.setState({ articles: [], loading: false });
+    }
   }
 
   async componentDidMount() {
@@ -49,15 +62,9 @@ export class NewsComp extends Component {
   }
 
   fetchMoreData = async () => {
-    this.setState({ page: this.state.page + 1 });
-    const url = `https://newsapi.org/v2/top-headlines?country=${this.props.country}&category=${this.props.category}&apiKey=619262788d3749169804d7f7be46b962&page=${this.state.page}&pageSize=${this.props.pageSize}`;
-    let data = await fetch(url);
-    let parseddata = await data.json();
-    this.setState({
-      articles: this.state.articles.concat(parseddata.articles),
-      totalResults: parseddata.totalResults,
-    });
+    this.setState({ hasMore: false });
   };
+
   render() {
     return (
       <>
@@ -70,32 +77,37 @@ export class NewsComp extends Component {
         </h1>
         {this.state.loading && <Spinner />}
         <InfiniteScroll
-          dataLength={this.state.articles.length}
+          dataLength={this.state.articles ? this.state.articles.length : 0}
           next={this.fetchMoreData}
-          hasMore={this.state.articles.length < this.state.totalResults}
+          hasMore={false}
           loader={<Spinner />}
         >
           <div className="container">
             <div className="row">
-              {this.state.articles.map((element) => {
-                return (
-                  <div className="col-md-4 my-3" key={element.url}>
-                    <NewsItem
-                      title={element.title ? element.title.slice(0, 45) : ""}
-                      description={
-                        element.description
-                          ? element.description.slice(0, 88)
-                          : ""
-                      }
-                      imageUrl={element.urlToImage}
-                      newsUrl={element.url}
-                      author={element.author}
-                      date={element.publishedAt}
-                      source={element.source.name}
-                    />
-                  </div>
-                );
-              })}
+              {this.state.articles &&
+                this.state.articles.map((element, index) => {
+                  return (
+                    <div className="col-md-4 my-3" key={element.url || index}>
+                      <NewsItem
+                        title={
+                          element.title
+                            ? element.title.slice(0, 45) + "..."
+                            : "No Title"
+                        }
+                        description={
+                          element.description
+                            ? element.description.slice(0, 88) + "..."
+                            : "No Description Available"
+                        }
+                        imageUrl={element.urlToImage}
+                        newsUrl={element.url}
+                        author={element.author || "Unknown"}
+                        date={element.publishedAt}
+                        source={element.source ? element.source.name : "News"}
+                      />
+                    </div>
+                  );
+                })}
             </div>
           </div>
         </InfiniteScroll>
@@ -103,4 +115,5 @@ export class NewsComp extends Component {
     );
   }
 }
+
 export default NewsComp;
